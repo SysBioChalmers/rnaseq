@@ -32,10 +32,10 @@ def helpMessage() {
 
     Mandatory arguments:
       --reads                       Path to input data (must be surrounded with quotes)
-      --genome                      Name of iGenomes reference
       -profile                      Configuration profile to use. uppmax / uppmax_modules / hebbe / docker / aws
 
     Options:
+      --genome                      Name of iGenomes reference
       --singleEnd                   Specifies that the input is single end reads
     Strandedness:
       --forward_stranded            The library is forward stranded
@@ -49,8 +49,6 @@ def helpMessage() {
       --gtf                         Path to GTF file
       --gff                         Path to GFF3 file
       --bed12                       Path to bed12 file
-      --downloadFasta               If no STAR / Fasta reference is supplied, a URL can be supplied to download a Fasta file at the start of the pipeline.
-      --downloadGTF                 If no GTF reference is supplied, a URL can be supplied to download a Fasta file at the start of the pipeline.
       --saveReference               Save the generated reference files the the Results directory.
       --saveTrimmed                 Save trimmed FastQ file intermediates
       --saveAlignedIntermediates    Save the BAM files from the Aligment step  - not done by default
@@ -63,6 +61,7 @@ def helpMessage() {
 
     Presets:
       --pico                        Sets trimming and standedness settings for the SMARTer Stranded Total RNA-Seq Kit - Pico Input kit. Equivalent to: --forward_stranded --clip_r1 3 --three_prime_clip_r2 3
+      --fcExtraAttributes           Define which extra parameters should also be included in featureCounts (default: gene_names)
 
     Other options:
       --outdir                      The output directory where the results will be saved
@@ -96,7 +95,6 @@ def helpMessage() {
 
 
 // Show help emssage
-params.help = false
 if (params.help){
     helpMessage()
     exit 0
@@ -107,28 +105,14 @@ if (params.genomes && params.genome && !params.genomes.containsKey(params.genome
     exit 1, "The provided genome '${params.genome}' is not available in the iGenomes file. Currently the available genomes are ${params.genomes.keySet().join(", ")}"
   }
 
-// Configurable variables
-params.name = false
-params.project = false
-params.genome = false
+// Reference index path configuration
+// Define these here - after the profiles are loaded with the iGenomes paths
 params.star_index = params.genome ? params.genomes[ params.genome ].star ?: false : false
 params.fasta = params.genome ? params.genomes[ params.genome ].fasta ?: false : false
 params.gtf = params.genome ? params.genomes[ params.genome ].gtf ?: false : false
 params.gff = params.genome ? params.genomes[ params.genome ].gff ?: false : false
 params.bed12 = params.genome ? params.genomes[ params.genome ].bed12 ?: false : false
 params.hisat2_index = params.genome ? params.genomes[ params.genome ].hisat2 ?: false : false
-params.multiqc_config = "$baseDir/assets/multiqc_config.yaml"
-params.email = false
-params.plaintext_email = false
-params.seqCenter = false
-params.skip_qc = false
-params.skip_fastqc = false
-params.skip_rseqc = false
-params.skip_genebody_coverage = false
-params.skip_preseq = false
-params.skip_dupradar = false
-params.skip_edger = false
-params.skip_multiqc = false
 
 mdsplot_header = file("$baseDir/assets/mdsplot_header.txt")
 heatmap_header = file("$baseDir/assets/heatmap_header.txt")
@@ -147,7 +131,6 @@ reverse_stranded = params.reverse_stranded
 unstranded = params.unstranded
 
 // Preset trimming options
-params.pico = false
 if (params.pico){
     clip_r1 = 3
     clip_r2 = 0
@@ -572,7 +555,7 @@ if(params.aligner == 'star'){
         script:
         prefix = reads[0].toString() - ~/(_R1)?(_trimmed)?(_val_1)?(\.fq)?(\.fastq)?(\.gz)?$/
         def star_mem = task.memory ?: params.star_memory ?: false
-        def avail_mem = star_mem ? "--limitBAMsortRAM ${star_mem.toBytes() - 100000000}" : '' 
+        def avail_mem = star_mem ? "--limitBAMsortRAM ${star_mem.toBytes() - 100000000}" : ''
         seqCenter = params.seqCenter ? "--outSAMattrRGline ID:$prefix 'CN:$params.seqCenter'" : ''
         """
         STAR --genomeDir $index \\
@@ -688,6 +671,7 @@ if(params.aligner == 'hisat2'){
         """
     }
 }
+
 /*
  * STEP 4 - RSeQC analysis
  */
@@ -730,12 +714,6 @@ process rseqc {
     file "*.{txt,pdf,r,xls}" into rseqc_results
 
     script:
-    def strandRule = ''
-    if (forward_stranded && !unstranded){
-        strandRule = params.singleEnd ? '-d ++,--' : '-d 1++,1--,2+-,2-+'
-    } else if (reverse_stranded && !unstranded){
-        strandRule = params.singleEnd ? '-d +-,-+' : '-d 1+-,1-+,2++,2--'
-    }
     """
     samtools index $bam_rseqc
     infer_experiment.py -i $bam_rseqc -r $bed12 > ${bam_rseqc.baseName}.infer_experiment.txt
@@ -934,6 +912,7 @@ process featureCounts {
 
     script:
     def featureCounts_direction = 0
+    def extraAttributes = params.fcExtraAttributes ? "--extraAttributes ${params.fcExtraAttributes}" : ''
     if (forward_stranded && !unstranded) {
         featureCounts_direction = 1
     } else if (reverse_stranded && !unstranded){
@@ -942,7 +921,7 @@ process featureCounts {
     // Try to get real sample name
     sample_name = bam_featurecounts.baseName - 'Aligned.sortedByCoord.out'
     """
-    featureCounts -a $gtf -g gene_id -o ${bam_featurecounts.baseName}_gene.featureCounts.txt -p -s $featureCounts_direction $bam_featurecounts
+    featureCounts -a $gtf -g gene_id -o ${bam_featurecounts.baseName}_gene.featureCounts.txt $extraAttributes -p -s $featureCounts_direction $bam_featurecounts
     featureCounts -a $gtf -g gene_biotype -o ${bam_featurecounts.baseName}_biotype.featureCounts.txt -p -s $featureCounts_direction $bam_featurecounts
     cut -f 1,7 ${bam_featurecounts.baseName}_biotype.featureCounts.txt | tail -n +3 | cat $biotypes_header - >> ${bam_featurecounts.baseName}_biotype_counts_mqc.txt
     mqc_features_stat.py ${bam_featurecounts.baseName}_biotype_counts_mqc.txt -s $sample_name -f rRNA -o ${bam_featurecounts.baseName}_biotype_counts_gs_mqc.tsv
@@ -964,9 +943,18 @@ process merge_featureCounts {
     file 'merged_gene_counts.txt'
 
     script:
+    if (input_files.size() == 1) {
     """
-    merge_featurecounts.py -o merged_gene_counts.txt -i $input_files
+    mv $input_files[0] 'merged_gene_counts.txt'
     """
+    } else {
+    """
+    csvtk join -t -f "Geneid,Start,Length,End,Chr,Strand,gene_name" $input_files  | \\
+    csvtk cut -t -f "-Start,-Chr,-End,-Length,-Strand" |  \\
+    sed 's/Aligned.sortedByCoord.out.markDups.bam//g' \\
+    > merged_gene_counts.txt
+    """
+    }
 }
 
 
