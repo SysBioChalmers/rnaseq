@@ -125,17 +125,19 @@ These flags affect the commands used for several steps in the pipeline - namely 
   * RSeQC: `-d +-,-+` / `-d 1+-,1-+,2++,2--`
   * StringTie: `--rf`
 
+## FeatureCounts Extra Gene Names
+By default, the pipeline uses `gene_names` as additional gene identifiers apart from ENSEMBL identifiers in the pipeline.
+This behaviour can be modified by specifying `--fcExtraAttributes` when running the pipeline, which is passed on to featureCounts as an `--extraAttributes` parameter.
+See the user guide of the [Subread package here](http://bioinf.wehi.edu.au/subread-package/SubreadUsersGuide.pdf).
+Note that you can also specify more than one desired value, separated by a comma:
+``--fcExtraAttributes gene_id,...``
+
 ## Alignment tool
 By default, the pipeline uses [STAR](https://github.com/alexdobin/STAR) to align the raw FastQ reads to the reference genome. STAR is fast and common, but requires a lot of memory to run, typically around 38GB for the Human GRCh37 reference genome.
 
 If you prefer, you can use [HISAT2](https://ccb.jhu.edu/software/hisat2/index.shtml) as the alignment tool instead. Developed by the same group behind the popular Tophat aligner, HISAT2 has a much smaller memory footprint.
 
 To use HISAT2, use the parameter `--aligner hisat2` or set `params.aligner = 'hisat2'` in your config file.
-
-#### Minimum alignment lengths
-When using STAR as the aligner then the pipeline sets the minimum alignment length to 15 base pairs. This filters out very short read alignments that can result from soft-clipping.
-
-To customise this threshold, use the pipeline command line parameter `--min_aln_length [num]`, where `[num]` is the minimum required alignment length in base pairs. Mapping sensitivity can be improved by increasing this value, or made more flexible by decreasing it. The default value in STAR is `0`.
 
 ## Reference Genomes
 
