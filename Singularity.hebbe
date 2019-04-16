@@ -19,6 +19,7 @@ Bootstrap:docker
     mkdir -p /c3se
     mkdir -p /local
     mkdir -p /apps
+    mkdir -p /priv
     mkdir -p /usr/share/lmod/lmod
     mkdir -p /var/hasplm
     mkdir -p /var/opt/thinlinc
