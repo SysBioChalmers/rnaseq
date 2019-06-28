@@ -2,9 +2,9 @@ From:nfcore/base
 Bootstrap:docker
 
 %labels
-    MAINTAINER Phil Ewels <phil.ewels@scilifelab.se>
-    DESCRIPTION Singularity image containing all requirements for the nf-core/rnaseq pipeline
-    VERSION 1.1
+    MAINTAINER SysBioChalmers
+    DESCRIPTION Singularity image containing the nf-core/rnaseq pipeline tweaked for the Hebbe cluster at Chalmers University of Technology
+    VERSION 1.3
 
 %environment
     PATH=/opt/conda/envs/nf-core-rnaseq-1.1/bin:$PATH
