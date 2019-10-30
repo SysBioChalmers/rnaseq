@@ -833,7 +833,7 @@ process markDuplicates {
         avail_mem = task.memory.toGiga()
     }
     """
-    picard -Xmx${avail_mem}g MarkDuplicates \\
+    picard -Xmx${avail_mem}G MarkDuplicates \\
         INPUT=$bam \\
         OUTPUT=${bam.baseName}.markDups.bam \\
         METRICS_FILE=${bam.baseName}.markDups_metrics.txt \\
